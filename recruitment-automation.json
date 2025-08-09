@@ -1,0 +1,134 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=site:linkedin.com/in \"{{ $json.body.jobTitle }}\" {{ $json.body.skills }}"
+            },
+            {
+              "name": "engine",
+              "value": "google"
+            },
+            {
+              "name": "api_key",
+              "value": "REPLACE_WITH_SERPAPI_KEY"
+            },
+            {
+              "name": "location",
+              "value": "={{ $json.body.location }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "id": "3c3f54c1-0982-43fb-929a-4509ec07e3bb",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "get_cottonpicker",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "f1a3f1c7-5240-44ea-9cd6-2d60e984b387",
+      "name": "Webhook",
+      "webhookId": "REPLACE_WITH_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $json.search_parameters.q || \"\";\nconst skillsPart = query.split('\"')[2] || \"\";\nconst skillList = skillsPart.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\n\nlet results = [];\n\nfor (const result of $json.organic_results || []) {\n  if (result.link.includes(\"linkedin.com/in\")) {\n    const snippet = (result.snippet || \"\").toLowerCase();\n\n    const matchedSkills = skillList.filter(skill =>\n      snippet.includes(skill)\n    );\n\n    const matchPercent = skillList.length > 0\n      ? (matchedSkills.length / skillList.length) * 100\n      : 0;\n\n    if (matchPercent > 0) {\n      results.push({\n        title: result.title || \"\",\n        link: result.link || \"\",\n        snippet: result.snippet || \"\",\n        matchedSkills,\n        matchPercent: Math.round(matchPercent)\n      });\n    }\n  }\n}\n\nresults.sort((a, b) => b.matchPercent - a.matchPercent);\n\nreturn results.map(item => ({ json: item }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "id": "8025cef6-3c16-4eea-8c7b-e8dfa191c396",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "REPLACE_WITH_SHEET_ID",
+        "sheetName": "Sheet1",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "NAME": "={{ $json.title }}",
+            "Linkedin_Profile": "={{ $json.link }}",
+            "Skills_Matched": "={{ $json.matchedSkills }}",
+            "Percent_Match": "={{ $json.matchPercent }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [660, 0],
+      "id": "a860d78a-b534-45e0-b6f0-be6cd229cb42",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "REPLACE_WITH_NOTIFICATION_EMAIL",
+        "subject": "=Found Matching Candidates for <{{ $('Webhook').item.json.body.jobTitle }}>",
+        "emailType": "text",
+        "message": "=Hello HR Team,\n\nThe HR bot has found candidates matching the required skills for the <{{ $('Webhook').item.json.body.jobTitle }}> position.\n\nView the candidate list in Google Sheets:\nREPLACE_WITH_SPREADSHEET_URL\n\nBest regards,\nHR Automation Bot",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [880, 0],
+      "id": "7950ed40-b6f6-4840-bc34-9656b85acf98",
+      "name": "Send a message",
+      "executeOnce": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_CREDENTIAL_NAME"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [{ "node": "Code", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [{ "node": "HTTP Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code": {
+      "main": [
+        [{ "node": "Append row in sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [{ "node": "Send a message", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REPLACE_WITH_INSTANCE_ID"
+  }
+}
