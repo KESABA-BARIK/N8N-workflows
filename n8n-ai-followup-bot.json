@@ -1,0 +1,179 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "form",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [360, 560],
+      "id": "f405de89-ecba-424c-8ef0-d8e250755ca8",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.body.email }}",
+        "subject": "Thanks for your form submission!",
+        "message": "=Hi {{ $json.body.name || 'there' }},<br><br>  Thanks for downloading our eBook! 🎉<br> We're excited for you to check it out.<br><br>  👉 <a href=\"https://example.com/downloads/pdf\" target=\"_blank\">Click here to download your copy</a><br><br>  Let us know if you have any questions or need help with anything.<br><br>  Warm regards,<br> The AGILES Team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [580, 560],
+      "id": "d67d03ea-4386-494f-948b-733d0cb29b22",
+      "name": "Send a message1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "YOUR_GMAIL_ACCOUNT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [800, 560],
+      "id": "0c84f620-8abf-4b49-87a7-b12f48764480",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/mistral-7b-instruct-v0.3",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [1020, 780],
+      "id": "41800000-0b3b-4533-998c-a2b1e655acce",
+      "name": "OpenRouter Chat Model1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "",
+          "name": "YOUR_OPENROUTER_ACCOUNT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a helpful assistant. Based on the user info, write a re-engagement email.\n\nUser Info:\n- Name: {{ $('Webhook').item.json.body.name }}\n- Email: {{ $('Webhook').item.json.body.email }}\n\nRespond ONLY in this JSON format:\n{\n  \"email\": \"user@example.com\",\n  \"message\": \"Hi {{ $('Webhook').item.json.body.name }}, <email content>\"\n}\nDo not add explanations. Return only the JSON.\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a helpful assistant. Only return valid JSON. Do not include markdown, code blocks, or natural language. No explanations.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [1020, 560],
+      "id": "4b821585-3872-4f48-82b5-5dec1050d1a3",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"email\": \"string\",\n  \"message\": \"<Generated follow-up email body>\"\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [1200, 780],
+      "id": "279e04f9-a164-4c8d-adda-efdb1bc46806",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.output.email }}",
+        "subject": "Just checking in about your experience",
+        "emailType": "text",
+        "message": "=Hi {{ $('Webhook').item.json.body.name }},\n\nHope you're doing well! A couple of days ago, you downloaded our eBook and I just wanted to check in.\n\nDid you get a chance to go through it? We put together some really helpful insights and we'd love to hear what you think!\n\nIf you have any questions or would like to chat more about how this can help your business, feel free to hit reply 😊\n\n👉 [Click here to schedule a call](https://example.com/schedule?source=email_followup)\n\nCheers,  \nsenior\nAgiles/marketing head \n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1396, 560],
+      "id": "e8b7bc2c-eb9a-4360-9ca9-cbe43b35ebb9",
+      "name": "Send a message2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "YOUR_GMAIL_ACCOUNT"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
