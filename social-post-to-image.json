@@ -1,0 +1,162 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/datasets/YOUR_DATASET_ID/items?token={{ $env.APIFY_TOKEN }}",
+        "options": {}
+      },
+      "id": "ee3b397d-5b68-493e-bb81-cc44edf95b87",
+      "name": "Run Actor Synchronously",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [-600, 400],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "{{ $env.SHEET_ID_1 }}",
+          "mode": "list",
+          "cachedResultName": "Insta_scraped",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/{{ $env.SHEET_ID_1 }}/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/{{ $env.SHEET_ID_1 }}/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CAPTIONS": "={{ $json.caption }}",
+            "LIKES": "={{ $json.likes }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "CAPTIONS", "displayName": "CAPTIONS", "type": "string" },
+            { "id": "LIKES", "displayName": "LIKES", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "34039a9f-aa25-479b-8d15-0b7d62851227",
+      "name": "Add Entries",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [-140, 400],
+      "typeVersion": 4.5
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "triggerAtHour": 6 }] }
+      },
+      "id": "edbb4cbf-2222-4466-917e-59a3ad3bf5cd",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [-800, 400],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "let totalLikes = 0;\nlet count = 0;\n\nfor (const item of items) {\n  if (typeof item.json.likesCount === 'number') {\n    totalLikes += item.json.likesCount;\n    count++;\n  }\n}\n\nconst avgLikes = count > 0 ? totalLikes / count : 0;\n\nreturn items.filter(item => item.json.likesCount > avgLikes).map(item => ({ json: { caption: item.json.caption, likes: item.json.likesCount } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-380, 400],
+      "id": "752b161f-c5f2-412a-8ea1-d055ddb57f50",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/mistral-nemo",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [420, 640],
+      "id": "45c3615e-9d90-4d68-b537-e1173e0b86a3",
+      "name": "OpenRouter Chat Model"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.CAPTIONS }}\n",
+        "options": {
+          "systemMessage": "You are a visual storyteller. Your goal is to generate a compelling and imaginative image that captures the essence and emotional theme of the content described.\nEnsure it is brief"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [360, 380],
+      "id": "ef8e4752-c56c-4005-9dc3-0a334bea7a42",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/ {{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 380],
+      "id": "1832989e-77f7-4c7e-8033-cca792adaa61",
+      "name": "HTTP Request",
+      "executeOnce": true
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [80, 340],
+      "id": "91d188ce-4612-4429-9d8e-ed6881fe8691",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "{{ $env.SHEET_ID_2 }}",
+          "mode": "list",
+          "cachedResultName": "EliGen",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/{{ $env.SHEET_ID_2 }}/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/{{ $env.SHEET_ID_2 }}/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "fileURL": "=https://image.pollinations.ai/prompt/  {{ $('AI Agent').item.json.output }}"
+          },
+          "matchingColumns": ["fileURL"],
+          "schema": [{ "id": "fileURL", "displayName": "fileURL", "type": "string" }]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [940, 380],
+      "id": "e74c92ea-606e-4142-973f-f5f861dd7bb7",
+      "name": "Append row in sheet"
+    }
+  ],
+  "connections": {
+    "Run Actor Synchronously": { "main": [[{ "node": "Code", "type": "main", "index": 0 }]] },
+    "Add Entries": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] },
+    "Schedule Trigger": { "main": [[{ "node": "Run Actor Synchronously", "type": "main", "index": 0 }]] },
+    "Code": { "main": [[{ "node": "Add Entries", "type": "main", "index": 0 }]] },
+    "OpenRouter Chat Model": { "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Agent": { "main": [[{ "node": "HTTP Request", "type": "main", "index": 0 }]] },
+    "HTTP Request": { "main": [[{ "node": "Append row in sheet", "type": "main", "index": 0 }]] },
+    "Loop Over Items": { "main": [[], [{ "node": "AI Agent", "type": "main", "index": 0 }]] },
+    "Append row in sheet": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] }
+  },
+  "meta": { "templateCredsSetupCompleted": true }
+}
