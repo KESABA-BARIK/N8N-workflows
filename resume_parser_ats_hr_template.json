@@ -1,0 +1,162 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Job Application",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Full Name" },
+            { "fieldLabel": "Email Address" },
+            { "fieldLabel": "Linkedin profile URL" },
+            { "fieldLabel": "Skills" },
+            { "fieldLabel": "Resume", "fieldType": "file", "acceptFileTypes": ".pdf, .docs, .dox" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [120, 360],
+      "id": "4f23a6bd-7263-43fc-ae13-8a68589b6986",
+      "name": "On form submission",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Resume",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [320, 360],
+      "id": "b832de03-d299-43b1-8c03-fe312faa0770",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "suitable_candidates",
+          "cachedResultUrl": "YOUR_SPREADSHEET_URL"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "YOUR_SPREADSHEET_URL"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.name }}",
+            "skillset": "={{ $json.skills }}",
+            "EMAIL": "={{ $json.email }}",
+            "contact": "={{ $json.phone }}",
+            "linkedin": "={{ $('On form submission').item.json[\"Linkedin profile URL\"] }}",
+            "ATS score": "={{ $json[\"ATS score\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Name", "displayName": "Name", "type": "string" },
+            { "id": "skillset", "displayName": "skillset", "type": "string" },
+            { "id": "linkedin", "displayName": "linkedin", "type": "string" },
+            { "id": "contact", "displayName": "contact", "type": "string" },
+            { "id": "EMAIL", "displayName": "EMAIL", "type": "string" },
+            { "id": "ATS score", "displayName": "ATS score", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [1180, 360],
+      "id": "3b927d37-799c-4b4b-a996-2d68ab7054b3",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "REPLACE_WITH_YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given the following resume text, extract and return only the following fields in **valid JSON format**:\n\n- \"name\": Full name of the candidate  \n- \"linkedin\": LinkedIn profile URL  \n- \"email\": Email address  \n- \"phone\": Contact number (digits only — remove all symbols like +, -, (), spaces, etc.)  \n- \"skills\": List of identified skills (as an array of lowercase strings)  \n- \"ATS score\": A score out of 100, based on the percentage of required skills matched\n\n### Required Skills to Match:\n[\n  \"react.js\",\n  \"node.js\",\n  \"mongodb\",\n  \"express.js\",\n  \"tailwind css\",\n  \"docker\",\n  \"git\",\n  \"jwt authentication\",\n  \"typescript\",\n  \"postgresql\"\n]\n\n### ATS Scoring Rule:\n- Count how many of the required skills are present in the resume.\n- The ATS score is calculated as:\n  (matchedSkills.length / totalRequiredSkills.length) × 100\n- Return the score as a whole number (rounded)\n\nRules:\n- Respond with ONLY valid JSON.\n- Do NOT include any explanation, comments, markdown, or additional text.\n- All fields must be present.\n- Use empty string or empty array if information is missing.\n- \"skills\" must be lowercase.\n- \"phone\" must contain only digits.\n- \"ATS score\" must be a number between 0–100.\n\nResume Text:\n\"\"\"\n{{ $json.text }}\n\"\"\"",
+        "options": {
+          "systemMessage": "You are a resume parser and ATS (Applicant Tracking System) AI."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [540, 360],
+      "id": "71f22f80-47f7-44fe-9d58-15c0b92cbaff",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/mistral-7b-instruct",
+        "options": { "responseFormat": "json_object" }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [580, 580],
+      "id": "05b7cbfd-0b80-4f37-8aeb-a8373f609ba3",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "",
+          "name": "REPLACE_WITH_YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "your.email@example.com",
+        "subject": "Job Application Received",
+        "emailType": "text",
+        "message": "=Job Application Received from {{ $json.Name }}\n\nATS score of: {{ $json[\"ATS score\"] }}\n\nRefer the spreadsheet below:\nYOUR_SPREADSHEET_URL",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1400, 360],
+      "id": "bfd62e9c-c6b2-4998-8b69-bdc544a55839",
+      "name": "Send a message1",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "REPLACE_WITH_YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.output;\n\n// Remove any 'json' prefix and comments\nconst cleaned = input.replace(/^json/, \"\").trim().replace(/\\/\\/.*/, '');\n\n// Parse the JSON string\nconst jsonData = JSON.parse(cleaned);\n\nreturn [{ json: jsonData }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 360],
+      "id": "063bfb53-e021-4ff0-b600-987ae1e8d93f",
+      "name": "Code1"
+    }
+  ],
+  "connections": {
+    "On form submission": { "main": [ [ { "node": "Extract from File", "type": "main", "index": 0 } ] ] },
+    "Extract from File": { "main": [ [ { "node": "AI Agent", "type": "main", "index": 0 } ] ] },
+    "Append row in sheet1": { "main": [ [ { "node": "Send a message1", "type": "main", "index": 0 } ] ] },
+    "AI Agent": { "main": [ [ { "node": "Code1", "type": "main", "index": 0 } ] ] },
+    "OpenRouter Chat Model": { "ai_languageModel": [ [ { "node": "AI Agent", "type": "ai_languageModel", "index": 0 } ] ] },
+    "Code1": { "main": [ [ { "node": "Append row in sheet1", "type": "main", "index": 0 } ] ] }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REPLACE_WITH_YOUR_INSTANCE_ID"
+  }
+}
